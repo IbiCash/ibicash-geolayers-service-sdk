@@ -3,6 +3,7 @@ import { AviationDomain } from './domains/aviation';
 import { EventsDomain } from './domains/events';
 import { FireDomain } from './domains/fire';
 import { MaritimeDomain } from './domains/maritime';
+import { ObservationsDomain } from './domains/observations';
 import { SeismicDomain } from './domains/seismic';
 import { TropicalDomain } from './domains/tropical';
 import { VolcanicDomain } from './domains/volcanic';
@@ -21,6 +22,8 @@ export class GeoLayersSDK {
     public readonly weather: WeatherDomain;
     public readonly maritime: MaritimeDomain;
     public readonly aviation: AviationDomain;
+    /** Observation data warehouse and active stations */
+    public readonly observations: ObservationsDomain;
     /** Real-time event stream (SSE) */
     public readonly events: EventStream;
     /** Event metadata operations (REST) */
@@ -34,6 +37,7 @@ export class GeoLayersSDK {
         this.weather = new WeatherDomain(config);
         this.maritime = new MaritimeDomain(config);
         this.aviation = new AviationDomain(config);
+        this.observations = new ObservationsDomain(config);
         this.events = new EventStream(config);
         this.eventsMeta = new EventsDomain(config);
     }

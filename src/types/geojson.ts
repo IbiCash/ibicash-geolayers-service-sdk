@@ -335,3 +335,68 @@ export const FlightScheduleResponseSchema = z.object({
 });
 
 export type FlightScheduleResponse = z.infer<typeof FlightScheduleResponseSchema>;
+
+// --- Data Warehouse Observation Types ---
+
+/**
+ * Valid observation providers for data warehouse queries.
+ */
+export const ObservationProviderSchema = z.enum(['wis2', 'iem', 'buoy', 'openmeteo', 'nws']);
+export type ObservationProvider = z.infer<typeof ObservationProviderSchema>;
+
+/**
+ * Response from GET /observations/station/:stationId
+ */
+export const StationObservationsResultSchema = z.object({
+    stationId: z.string(),
+    provider: ObservationProviderSchema,
+    observations: z.array(StandardObservationSchema),
+    count: z.number(),
+    timeRange: z.object({
+        start: z.string().or(z.date()),
+        end: z.string().or(z.date()),
+    }),
+    source: z.literal('data-warehouse'),
+});
+
+export type StationObservationsResult = z.infer<typeof StationObservationsResultSchema>;
+
+/**
+ * Response from GET /observations/station/:stationId/latest
+ */
+export const LatestObservationResultSchema = z.object({
+    stationId: z.string(),
+    provider: ObservationProviderSchema,
+    observation: StandardObservationSchema.nullable(),
+    source: z.literal('data-warehouse'),
+});
+
+export type LatestObservationResult = z.infer<typeof LatestObservationResultSchema>;
+
+/**
+ * Response from GET /observations/bbox
+ */
+export const BboxObservationsResultSchema = z.object({
+    bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+    provider: ObservationProviderSchema,
+    observations: z.array(StandardObservationSchema),
+    count: z.number(),
+    timeRange: z.object({
+        start: z.string().or(z.date()),
+        end: z.string().or(z.date()),
+    }),
+    source: z.literal('data-warehouse'),
+});
+
+export type BboxObservationsResult = z.infer<typeof BboxObservationsResultSchema>;
+
+/**
+ * Response from GET /observations/stats
+ */
+export const ObservationStatsResultSchema = z.object({
+    provider: z.string(),
+    totalObservations: z.number(),
+    source: z.literal('data-warehouse'),
+});
+
+export type ObservationStatsResult = z.infer<typeof ObservationStatsResultSchema>;

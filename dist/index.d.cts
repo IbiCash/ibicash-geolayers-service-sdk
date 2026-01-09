@@ -439,6 +439,135 @@ declare const FlightScheduleResponseSchema: z.ZodObject<{
     }, z.core.$strip>>;
 }, z.core.$strip>;
 type FlightScheduleResponse = z.infer<typeof FlightScheduleResponseSchema>;
+/**
+ * Valid observation providers for data warehouse queries.
+ */
+declare const ObservationProviderSchema: z.ZodEnum<{
+    wis2: "wis2";
+    iem: "iem";
+    buoy: "buoy";
+    openmeteo: "openmeteo";
+    nws: "nws";
+}>;
+type ObservationProvider = z.infer<typeof ObservationProviderSchema>;
+/**
+ * Response from GET /observations/station/:stationId
+ */
+declare const StationObservationsResultSchema: z.ZodObject<{
+    stationId: z.ZodString;
+    provider: z.ZodEnum<{
+        wis2: "wis2";
+        iem: "iem";
+        buoy: "buoy";
+        openmeteo: "openmeteo";
+        nws: "nws";
+    }>;
+    observations: z.ZodArray<z.ZodObject<{
+        timestamp: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+        stationId: z.ZodString;
+        latitude: z.ZodOptional<z.ZodNumber>;
+        longitude: z.ZodOptional<z.ZodNumber>;
+        measurements: z.ZodRecord<z.ZodString, z.ZodObject<{
+            value: z.ZodNumber;
+            unit: z.ZodString;
+            quality: z.ZodOptional<z.ZodEnum<{
+                good: "good";
+                suspect: "suspect";
+                estimated: "estimated";
+                missing: "missing";
+            }>>;
+        }, z.core.$strip>>;
+        metadata: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+        imageUrl: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>;
+    count: z.ZodNumber;
+    timeRange: z.ZodObject<{
+        start: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+        end: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+    }, z.core.$strip>;
+    source: z.ZodLiteral<"data-warehouse">;
+}, z.core.$strip>;
+type StationObservationsResult = z.infer<typeof StationObservationsResultSchema>;
+/**
+ * Response from GET /observations/station/:stationId/latest
+ */
+declare const LatestObservationResultSchema: z.ZodObject<{
+    stationId: z.ZodString;
+    provider: z.ZodEnum<{
+        wis2: "wis2";
+        iem: "iem";
+        buoy: "buoy";
+        openmeteo: "openmeteo";
+        nws: "nws";
+    }>;
+    observation: z.ZodNullable<z.ZodObject<{
+        timestamp: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+        stationId: z.ZodString;
+        latitude: z.ZodOptional<z.ZodNumber>;
+        longitude: z.ZodOptional<z.ZodNumber>;
+        measurements: z.ZodRecord<z.ZodString, z.ZodObject<{
+            value: z.ZodNumber;
+            unit: z.ZodString;
+            quality: z.ZodOptional<z.ZodEnum<{
+                good: "good";
+                suspect: "suspect";
+                estimated: "estimated";
+                missing: "missing";
+            }>>;
+        }, z.core.$strip>>;
+        metadata: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+        imageUrl: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>;
+    source: z.ZodLiteral<"data-warehouse">;
+}, z.core.$strip>;
+type LatestObservationResult = z.infer<typeof LatestObservationResultSchema>;
+/**
+ * Response from GET /observations/bbox
+ */
+declare const BboxObservationsResultSchema: z.ZodObject<{
+    bbox: z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber], null>;
+    provider: z.ZodEnum<{
+        wis2: "wis2";
+        iem: "iem";
+        buoy: "buoy";
+        openmeteo: "openmeteo";
+        nws: "nws";
+    }>;
+    observations: z.ZodArray<z.ZodObject<{
+        timestamp: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+        stationId: z.ZodString;
+        latitude: z.ZodOptional<z.ZodNumber>;
+        longitude: z.ZodOptional<z.ZodNumber>;
+        measurements: z.ZodRecord<z.ZodString, z.ZodObject<{
+            value: z.ZodNumber;
+            unit: z.ZodString;
+            quality: z.ZodOptional<z.ZodEnum<{
+                good: "good";
+                suspect: "suspect";
+                estimated: "estimated";
+                missing: "missing";
+            }>>;
+        }, z.core.$strip>>;
+        metadata: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+        imageUrl: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>;
+    count: z.ZodNumber;
+    timeRange: z.ZodObject<{
+        start: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+        end: z.ZodUnion<[z.ZodString, z.ZodDate]>;
+    }, z.core.$strip>;
+    source: z.ZodLiteral<"data-warehouse">;
+}, z.core.$strip>;
+type BboxObservationsResult = z.infer<typeof BboxObservationsResultSchema>;
+/**
+ * Response from GET /observations/stats
+ */
+declare const ObservationStatsResultSchema: z.ZodObject<{
+    provider: z.ZodString;
+    totalObservations: z.ZodNumber;
+    source: z.ZodLiteral<"data-warehouse">;
+}, z.core.$strip>;
+type ObservationStatsResult = z.infer<typeof ObservationStatsResultSchema>;
 
 declare abstract class BaseClient {
     protected readonly http: AxiosInstance;
@@ -637,6 +766,83 @@ declare class MaritimeDomain extends BaseClient {
 }
 
 /**
+ * Filters for data warehouse station observations.
+ */
+interface StationObservationFilters {
+    /** Observation provider */
+    provider: ObservationProvider;
+    /** Start date in ISO 8601 format */
+    start?: string;
+    /** End date in ISO 8601 format */
+    end?: string;
+    /** Quick time range selection (overridden by start/end) */
+    timePreset?: '1h' | '24h' | '7d' | '30d';
+    /** Maximum number of observations to return */
+    limit?: number;
+}
+/**
+ * Filters for bounding box observation queries.
+ */
+interface BboxFilters extends StationObservationFilters {
+    /** Minimum longitude (-180 to 180) */
+    minLon: number;
+    /** Minimum latitude (-90 to 90) */
+    minLat: number;
+    /** Maximum longitude (-180 to 180) */
+    maxLon: number;
+    /** Maximum latitude (-90 to 90) */
+    maxLat: number;
+}
+/**
+ * ObservationsDomain provides access to observation endpoints.
+ *
+ * This includes:
+ * - Active stations from WIS2 and IEM networks
+ * - Data warehouse queries (station, bbox, stats)
+ */
+declare class ObservationsDomain extends BaseClient {
+    /**
+     * Get active WIS2 stations that reported data in the last 24 hours.
+     */
+    getActiveWis2Stations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>>;
+    /**
+     * Get active IEM/AZOS stations that reported data in the last 24 hours.
+     */
+    getActiveIemStations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>>;
+    /**
+     * Get observations for a station from the data warehouse.
+     * @param stationId The station identifier.
+     * @param filters Query filters including provider and date range.
+     */
+    getStationObservations(stationId: string, filters: StationObservationFilters): Promise<StationObservationsResult>;
+    /**
+     * Get the latest observation for a station from the data warehouse.
+     * @param stationId The station identifier.
+     * @param provider The observation provider.
+     */
+    getLatestObservation(stationId: string, provider: ObservationProvider): Promise<LatestObservationResult>;
+    /**
+     * Get observations within a geographic bounding box.
+     * @param filters Bounding box coordinates and query filters.
+     */
+    getObservationsByBbox(filters: BboxFilters): Promise<BboxObservationsResult>;
+    /**
+     * Get data warehouse statistics.
+     * @param provider Optional provider filter. If not specified, returns stats for all providers.
+     */
+    getStats(provider?: ObservationProvider): Promise<ObservationStatsResult>;
+    /**
+     * Convert time preset to absolute date range parameters.
+     */
+    private buildDateParams;
+    /**
+     * Parse active stations response.
+     * The endpoint may return either a FeatureCollection directly or wrapped in LayerResponse.
+     */
+    private parseActiveStationsResponse;
+}
+
+/**
  * Time range presets for earthquake queries.
  * - `1h`: Last 1 hour
  * - `24h`: Last 24 hours (default)
@@ -784,6 +990,8 @@ declare class GeoLayersSDK {
     readonly weather: WeatherDomain;
     readonly maritime: MaritimeDomain;
     readonly aviation: AviationDomain;
+    /** Observation data warehouse and active stations */
+    readonly observations: ObservationsDomain;
     /** Real-time event stream (SSE) */
     readonly events: EventStream;
     /** Event metadata operations (REST) */
@@ -791,4 +999,4 @@ declare class GeoLayersSDK {
     constructor(config: GeoLayersConfig);
 }
 
-export { type ActiveVolcanoProps, ActiveVolcanoPropsSchema, DEFAULT_CONFIG, type EarthquakeProps, EarthquakePropsSchema, type EventPayload, EventPayloadSchema, type Feature, type FeatureCollection, type FlightProps, FlightPropsSchema, type FlightScheduleResponse, FlightScheduleResponseSchema, GeoLayersApiError, type GeoLayersConfig, GeoLayersError, GeoLayersSDK, GeoLayersValidationError, type Geometry, GeometrySchema, type LayerMetadata, LayerMetadataSchema, LayerProvider, type LayerResponse, type MeasurementValue, MeasurementValueSchema, type ObservationQueryResult, ObservationQueryResultSchema, type StandardMeasurements, StandardMeasurementsSchema, type StandardObservation, StandardObservationSchema, type StormProps, StormPropsSchema, type VolcanoProps, VolcanoPropsSchema, type WeatherStationProps, WeatherStationPropsSchema, type WildfireProps, WildfirePropsSchema, createFeatureCollectionSchema, createFeatureSchema, createLayerResponseSchema, GeoLayersSDK as default };
+export { type ActiveVolcanoProps, ActiveVolcanoPropsSchema, type BboxObservationsResult, BboxObservationsResultSchema, DEFAULT_CONFIG, type EarthquakeProps, EarthquakePropsSchema, type EventPayload, EventPayloadSchema, type Feature, type FeatureCollection, type FlightProps, FlightPropsSchema, type FlightScheduleResponse, FlightScheduleResponseSchema, GeoLayersApiError, type GeoLayersConfig, GeoLayersError, GeoLayersSDK, GeoLayersValidationError, type Geometry, GeometrySchema, type LatestObservationResult, LatestObservationResultSchema, type LayerMetadata, LayerMetadataSchema, LayerProvider, type LayerResponse, type MeasurementValue, MeasurementValueSchema, type ObservationProvider, ObservationProviderSchema, type ObservationQueryResult, ObservationQueryResultSchema, type ObservationStatsResult, ObservationStatsResultSchema, type StandardMeasurements, StandardMeasurementsSchema, type StandardObservation, StandardObservationSchema, type StationObservationsResult, StationObservationsResultSchema, type StormProps, StormPropsSchema, type VolcanoProps, VolcanoPropsSchema, type WeatherStationProps, WeatherStationPropsSchema, type WildfireProps, WildfirePropsSchema, createFeatureCollectionSchema, createFeatureSchema, createLayerResponseSchema, GeoLayersSDK as default };

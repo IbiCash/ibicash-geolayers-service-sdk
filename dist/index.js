@@ -288,6 +288,40 @@ var FlightScheduleResponseSchema = z2.object({
     cached: z2.boolean()
   }).optional()
 });
+var ObservationProviderSchema = z2.enum(["wis2", "iem", "buoy", "openmeteo", "nws"]);
+var StationObservationsResultSchema = z2.object({
+  stationId: z2.string(),
+  provider: ObservationProviderSchema,
+  observations: z2.array(StandardObservationSchema),
+  count: z2.number(),
+  timeRange: z2.object({
+    start: z2.string().or(z2.date()),
+    end: z2.string().or(z2.date())
+  }),
+  source: z2.literal("data-warehouse")
+});
+var LatestObservationResultSchema = z2.object({
+  stationId: z2.string(),
+  provider: ObservationProviderSchema,
+  observation: StandardObservationSchema.nullable(),
+  source: z2.literal("data-warehouse")
+});
+var BboxObservationsResultSchema = z2.object({
+  bbox: z2.tuple([z2.number(), z2.number(), z2.number(), z2.number()]),
+  provider: ObservationProviderSchema,
+  observations: z2.array(StandardObservationSchema),
+  count: z2.number(),
+  timeRange: z2.object({
+    start: z2.string().or(z2.date()),
+    end: z2.string().or(z2.date())
+  }),
+  source: z2.literal("data-warehouse")
+});
+var ObservationStatsResultSchema = z2.object({
+  provider: z2.string(),
+  totalObservations: z2.number(),
+  source: z2.literal("data-warehouse")
+});
 
 // src/core/config.ts
 var DEFAULT_CONFIG = {
@@ -520,6 +554,124 @@ var MaritimeDomain = class extends BaseClient {
   async getBuoyObservations(buoyId, filters) {
     const data = await this.get(`/observations/buoy/${buoyId}`, filters);
     return ObservationQueryResultSchema.parse(data);
+  }
+};
+
+// src/domains/observations.ts
+var ObservationsDomain = class extends BaseClient {
+  /**
+   * Get active WIS2 stations that reported data in the last 24 hours.
+   */
+  async getActiveWis2Stations() {
+    const rawData = await this.get("/observations/wis2/stations/active");
+    return this.parseActiveStationsResponse(rawData, "wis2");
+  }
+  /**
+   * Get active IEM/AZOS stations that reported data in the last 24 hours.
+   */
+  async getActiveIemStations() {
+    const rawData = await this.get("/observations/iem/stations/active");
+    return this.parseActiveStationsResponse(rawData, "iem");
+  }
+  /**
+   * Get observations for a station from the data warehouse.
+   * @param stationId The station identifier.
+   * @param filters Query filters including provider and date range.
+   */
+  async getStationObservations(stationId, filters) {
+    const params = this.buildDateParams(filters);
+    const data = await this.get(`/observations/station/${stationId}`, params);
+    return StationObservationsResultSchema.parse(data);
+  }
+  /**
+   * Get the latest observation for a station from the data warehouse.
+   * @param stationId The station identifier.
+   * @param provider The observation provider.
+   */
+  async getLatestObservation(stationId, provider) {
+    const data = await this.get(`/observations/station/${stationId}/latest`, { provider });
+    return LatestObservationResultSchema.parse(data);
+  }
+  /**
+   * Get observations within a geographic bounding box.
+   * @param filters Bounding box coordinates and query filters.
+   */
+  async getObservationsByBbox(filters) {
+    const params = {
+      ...this.buildDateParams(filters),
+      minLon: filters.minLon,
+      minLat: filters.minLat,
+      maxLon: filters.maxLon,
+      maxLat: filters.maxLat
+    };
+    const data = await this.get("/observations/bbox", params);
+    return BboxObservationsResultSchema.parse(data);
+  }
+  /**
+   * Get data warehouse statistics.
+   * @param provider Optional provider filter. If not specified, returns stats for all providers.
+   */
+  async getStats(provider) {
+    const params = provider ? { provider } : {};
+    const data = await this.get("/observations/stats", params);
+    return ObservationStatsResultSchema.parse(data);
+  }
+  /**
+   * Convert time preset to absolute date range parameters.
+   */
+  buildDateParams(filters) {
+    const params = {
+      provider: filters.provider
+    };
+    if (filters.limit !== void 0) {
+      params.limit = filters.limit;
+    }
+    if (filters.start && filters.end) {
+      params.start = filters.start;
+      params.end = filters.end;
+      return params;
+    }
+    if (filters.timePreset) {
+      const now = /* @__PURE__ */ new Date();
+      const presetMs = {
+        "1h": 60 * 60 * 1e3,
+        "24h": 24 * 60 * 60 * 1e3,
+        "7d": 7 * 24 * 60 * 60 * 1e3,
+        "30d": 30 * 24 * 60 * 60 * 1e3
+      };
+      const ms = presetMs[filters.timePreset];
+      params.start = new Date(now.getTime() - ms).toISOString();
+      params.end = now.toISOString();
+    }
+    return params;
+  }
+  /**
+   * Parse active stations response.
+   * The endpoint may return either a FeatureCollection directly or wrapped in LayerResponse.
+   */
+  parseActiveStationsResponse(rawData, provider) {
+    const featureCollection = rawData;
+    if (featureCollection?.type === "FeatureCollection") {
+      const features = (featureCollection.features ?? []).map((f) => {
+        const feature = f;
+        return {
+          type: "Feature",
+          geometry: feature.geometry,
+          properties: WeatherStationPropsSchema.parse(feature.properties ?? {}),
+          id: feature.id
+        };
+      });
+      return {
+        provider: `active-stations-${provider}`,
+        data: {
+          type: "FeatureCollection",
+          features
+        },
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        count: features.length
+      };
+    }
+    return this.parseGeoJSON(rawData, WeatherStationPropsSchema);
   }
 };
 
@@ -766,6 +918,8 @@ var GeoLayersSDK = class {
   weather;
   maritime;
   aviation;
+  /** Observation data warehouse and active stations */
+  observations;
   /** Real-time event stream (SSE) */
   events;
   /** Event metadata operations (REST) */
@@ -778,6 +932,7 @@ var GeoLayersSDK = class {
     this.weather = new WeatherDomain(config);
     this.maritime = new MaritimeDomain(config);
     this.aviation = new AviationDomain(config);
+    this.observations = new ObservationsDomain(config);
     this.events = new EventStream(config);
     this.eventsMeta = new EventsDomain(config);
   }
@@ -785,6 +940,7 @@ var GeoLayersSDK = class {
 var index_default = GeoLayersSDK;
 export {
   ActiveVolcanoPropsSchema,
+  BboxObservationsResultSchema,
   DEFAULT_CONFIG,
   EarthquakePropsSchema,
   EventPayloadSchema,
@@ -795,12 +951,16 @@ export {
   GeoLayersSDK,
   GeoLayersValidationError,
   GeometrySchema,
+  LatestObservationResultSchema,
   LayerMetadataSchema,
   LayerProvider,
   MeasurementValueSchema,
+  ObservationProviderSchema,
   ObservationQueryResultSchema,
+  ObservationStatsResultSchema,
   StandardMeasurementsSchema,
   StandardObservationSchema,
+  StationObservationsResultSchema,
   StormPropsSchema,
   VolcanoPropsSchema,
   WeatherStationPropsSchema,
