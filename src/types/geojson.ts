@@ -315,3 +315,23 @@ export const EventPayloadSchema = z.object({
 });
 
 export type EventPayload = z.infer<typeof EventPayloadSchema>;
+
+// --- Flight Schedule Types (AeroDataBox) ---
+
+/**
+ * Response schema for flight schedule endpoint.
+ * Uses passthrough for flexible AeroDataBox response handling.
+ */
+export const FlightScheduleResponseSchema = z.object({
+    provider: z.string(),
+    data: z.record(z.string(), z.unknown()), // AeroDataBox returns varied structure
+    timestamp: z.string(),
+    count: z.number().optional(),
+    metadata: z.object({
+        source: z.string(),
+        cacheTTL: z.number(),
+        cached: z.boolean(),
+    }).optional(),
+});
+
+export type FlightScheduleResponse = z.infer<typeof FlightScheduleResponseSchema>;

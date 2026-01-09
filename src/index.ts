@@ -1,5 +1,6 @@
 import { GeoLayersConfig } from './core/config';
 import { AviationDomain } from './domains/aviation';
+import { EventsDomain } from './domains/events';
 import { FireDomain } from './domains/fire';
 import { MaritimeDomain } from './domains/maritime';
 import { SeismicDomain } from './domains/seismic';
@@ -20,7 +21,10 @@ export class GeoLayersSDK {
     public readonly weather: WeatherDomain;
     public readonly maritime: MaritimeDomain;
     public readonly aviation: AviationDomain;
+    /** Real-time event stream (SSE) */
     public readonly events: EventStream;
+    /** Event metadata operations (REST) */
+    public readonly eventsMeta: EventsDomain;
 
     constructor(config: GeoLayersConfig) {
         this.seismic = new SeismicDomain(config);
@@ -31,7 +35,9 @@ export class GeoLayersSDK {
         this.maritime = new MaritimeDomain(config);
         this.aviation = new AviationDomain(config);
         this.events = new EventStream(config);
+        this.eventsMeta = new EventsDomain(config);
     }
 }
 
 export default GeoLayersSDK;
+

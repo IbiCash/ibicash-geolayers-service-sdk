@@ -17,6 +17,7 @@ var LayerProvider = /* @__PURE__ */ ((LayerProvider2) => {
   LayerProvider2["WIS2_STATIONS"] = "wis2-stations";
   LayerProvider2["GLOBAL_FLIGHTS"] = "global-flights";
   LayerProvider2["LIVE_FLIGHTS"] = "live-flights";
+  LayerProvider2["FLIGHT_SCHEDULE"] = "flight-schedule";
   return LayerProvider2;
 })(LayerProvider || {});
 var LayerMetadataSchema = z.object({
@@ -275,6 +276,18 @@ var EventPayloadSchema = z2.object({
   timestamp: z2.string(),
   action: z2.enum(["created", "updated", "deleted"]).optional()
 });
+var FlightScheduleResponseSchema = z2.object({
+  provider: z2.string(),
+  data: z2.record(z2.string(), z2.unknown()),
+  // AeroDataBox returns varied structure
+  timestamp: z2.string(),
+  count: z2.number().optional(),
+  metadata: z2.object({
+    source: z2.string(),
+    cacheTTL: z2.number(),
+    cached: z2.boolean()
+  }).optional()
+});
 
 // src/core/config.ts
 var DEFAULT_CONFIG = {
@@ -417,6 +430,57 @@ var AviationDomain = class extends BaseClient {
     const data = await this.get("/geojson/flights/live", params);
     return this.parseGeoJSON(data, FlightPropsSchema);
   }
+  /**
+   * Get flight schedule/details by callsign from AeroDataBox.
+   * @param callsign Flight identifier (e.g., 'UAL1234', 'AA100')
+   * @returns Raw flight schedule data from AeroDataBox API.
+   * 
+   * @example
+   * ```ts
+   * const schedule = await sdk.aviation.getFlightSchedule('UAL1234');
+   * console.log(schedule.data); // Flight details from AeroDataBox
+   * ```
+   */
+  async getFlightSchedule(callsign) {
+    const data = await this.get("/geojson/flights/schedule", { callsign });
+    return FlightScheduleResponseSchema.parse(data);
+  }
+};
+
+// src/domains/events.ts
+import { z as z3 } from "zod";
+var GeoLayersEventTypeSchema = z3.enum([
+  "earthquake.new",
+  "earthquake.updated",
+  "storm.new",
+  "storm.updated",
+  "wildfire.new",
+  "wildfire.updated",
+  "volcano.alert",
+  "snapshot.completed",
+  "snapshot.failed",
+  "observation.batch"
+]);
+var EventTypesResponseSchema = z3.object({
+  types: z3.array(GeoLayersEventTypeSchema),
+  descriptions: z3.record(z3.string(), z3.string())
+});
+var EventsDomain = class extends BaseClient {
+  /**
+   * Get list of available event types for the event stream.
+   * @returns Object with event types array and their descriptions.
+   * 
+   * @example
+   * ```ts
+   * const { types, descriptions } = await sdk.eventsMeta.getEventTypes();
+   * console.log(types); // ['earthquake.new', 'storm.new', ...]
+   * console.log(descriptions['earthquake.new']); // 'New earthquake detected'
+   * ```
+   */
+  async getEventTypes() {
+    const data = await this.get("/events/types");
+    return EventTypesResponseSchema.parse(data);
+  }
 };
 
 // src/domains/fire.ts
@@ -532,12 +596,12 @@ var TropicalDomain = class extends BaseClient {
 };
 
 // src/domains/volcanic.ts
-import { z as z3 } from "zod";
-var VolcanoesResponseSchema = z3.object({
-  provider: z3.string(),
-  data: z3.array(createFeatureSchema(VolcanoPropsSchema)),
-  timestamp: z3.string(),
-  count: z3.number().optional(),
+import { z as z4 } from "zod";
+var VolcanoesResponseSchema = z4.object({
+  provider: z4.string(),
+  data: z4.array(createFeatureSchema(VolcanoPropsSchema)),
+  timestamp: z4.string(),
+  count: z4.number().optional(),
   metadata: LayerMetadataSchema.optional()
 });
 var VolcanicDomain = class extends BaseClient {
@@ -607,6 +671,44 @@ var WeatherDomain = class extends BaseClient {
     const data = await this.get(`/observations/iem/${stationId}`, filters);
     return ObservationQueryResultSchema.parse(data);
   }
+  /**
+   * Get weather stations from NWS (National Weather Service) network.
+   */
+  async getNWSWeatherStations() {
+    const data = await this.get("/geojson/stations/nws");
+    return this.parseGeoJSON(data, WeatherStationPropsSchema);
+  }
+  /**
+   * Get active stations that have reported data in the last 24 hours.
+   * @param type The station network type ('iem' or 'wis2').
+   * 
+   * Note: This endpoint returns FeatureCollection directly (not LayerResponse envelope).
+   */
+  async getActiveStations(type) {
+    const rawData = await this.get("/stations/active", { type });
+    const featureCollection = rawData;
+    if (featureCollection?.type === "FeatureCollection") {
+      const features = (featureCollection.features ?? []).map((f) => {
+        const feature = f;
+        return {
+          type: "Feature",
+          geometry: feature.geometry,
+          properties: WeatherStationPropsSchema.parse(feature.properties ?? {}),
+          id: feature.id
+        };
+      });
+      return {
+        provider: `active-stations-${type}`,
+        data: {
+          type: "FeatureCollection",
+          features
+        },
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        count: features.length
+      };
+    }
+    return this.parseGeoJSON(rawData, WeatherStationPropsSchema);
+  }
 };
 
 // src/events/stream.ts
@@ -664,7 +766,10 @@ var GeoLayersSDK = class {
   weather;
   maritime;
   aviation;
+  /** Real-time event stream (SSE) */
   events;
+  /** Event metadata operations (REST) */
+  eventsMeta;
   constructor(config) {
     this.seismic = new SeismicDomain(config);
     this.volcanic = new VolcanicDomain(config);
@@ -674,6 +779,7 @@ var GeoLayersSDK = class {
     this.maritime = new MaritimeDomain(config);
     this.aviation = new AviationDomain(config);
     this.events = new EventStream(config);
+    this.eventsMeta = new EventsDomain(config);
   }
 };
 var index_default = GeoLayersSDK;
@@ -683,6 +789,7 @@ export {
   EarthquakePropsSchema,
   EventPayloadSchema,
   FlightPropsSchema,
+  FlightScheduleResponseSchema,
   GeoLayersApiError,
   GeoLayersError,
   GeoLayersSDK,

@@ -1,6 +1,8 @@
 import { BaseClient } from '../core/client';
 import {
+    Feature,
     FeatureCollection,
+    Geometry,
     LayerResponse,
     ObservationQueryResult,
     ObservationQueryResultSchema,
@@ -80,5 +82,52 @@ export class WeatherDomain extends BaseClient {
     async getIemObservations(stationId: string, filters: ObservationFilters): Promise<ObservationQueryResult> {
         const data = await this.get<ObservationQueryResult>(`/observations/iem/${stationId}`, filters);
         return ObservationQueryResultSchema.parse(data);
+    }
+
+    /**
+     * Get weather stations from NWS (National Weather Service) network.
+     */
+    async getNWSWeatherStations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
+        const data = await this.get<unknown>('/geojson/stations/nws');
+        return this.parseGeoJSON(data, WeatherStationPropsSchema);
+    }
+
+    /**
+     * Get active stations that have reported data in the last 24 hours.
+     * @param type The station network type ('iem' or 'wis2').
+     * 
+     * Note: This endpoint returns FeatureCollection directly (not LayerResponse envelope).
+     */
+    async getActiveStations(type: 'iem' | 'wis2'): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
+        const rawData = await this.get<unknown>('/stations/active', { type });
+
+        // The /stations/active endpoint returns FeatureCollection directly, not LayerResponse
+        // Parse it as FeatureCollection and wrap in LayerResponse format
+        const featureCollection = rawData as { type: string; features: unknown[]; metadata?: unknown };
+
+        if (featureCollection?.type === 'FeatureCollection') {
+            const features: Feature<WeatherStationProps>[] = (featureCollection.features ?? []).map((f: unknown) => {
+                const feature = f as { type: 'Feature'; geometry: Geometry; properties: unknown; id?: string | number };
+                return {
+                    type: 'Feature' as const,
+                    geometry: feature.geometry,
+                    properties: WeatherStationPropsSchema.parse(feature.properties ?? {}),
+                    id: feature.id,
+                };
+            });
+
+            return {
+                provider: `active-stations-${type}`,
+                data: {
+                    type: 'FeatureCollection' as const,
+                    features,
+                },
+                timestamp: new Date().toISOString(),
+                count: features.length,
+            };
+        }
+
+        // Fallback: try parsing as LayerResponse
+        return this.parseGeoJSON(rawData, WeatherStationPropsSchema);
     }
 }

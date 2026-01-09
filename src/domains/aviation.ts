@@ -3,6 +3,8 @@ import {
     FeatureCollection,
     FlightProps,
     FlightPropsSchema,
+    FlightScheduleResponse,
+    FlightScheduleResponseSchema,
     LayerResponse
 } from '../types';
 
@@ -60,5 +62,21 @@ export class AviationDomain extends BaseClient {
         };
         const data = await this.get<unknown>('/geojson/flights/live', params);
         return this.parseGeoJSON(data, FlightPropsSchema);
+    }
+
+    /**
+     * Get flight schedule/details by callsign from AeroDataBox.
+     * @param callsign Flight identifier (e.g., 'UAL1234', 'AA100')
+     * @returns Raw flight schedule data from AeroDataBox API.
+     * 
+     * @example
+     * ```ts
+     * const schedule = await sdk.aviation.getFlightSchedule('UAL1234');
+     * console.log(schedule.data); // Flight details from AeroDataBox
+     * ```
+     */
+    async getFlightSchedule(callsign: string): Promise<FlightScheduleResponse> {
+        const data = await this.get<unknown>('/geojson/flights/schedule', { callsign });
+        return FlightScheduleResponseSchema.parse(data);
     }
 }

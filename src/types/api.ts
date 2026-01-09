@@ -14,6 +14,7 @@ export enum LayerProvider {
     WIS2_STATIONS = 'wis2-stations',
     GLOBAL_FLIGHTS = 'global-flights',
     LIVE_FLIGHTS = 'live-flights',
+    FLIGHT_SCHEDULE = 'flight-schedule',
 }
 
 export const LayerMetadataSchema = z.object({

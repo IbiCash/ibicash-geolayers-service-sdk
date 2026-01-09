@@ -23,7 +23,8 @@ declare enum LayerProvider {
     AZOS_NETWORK = "azos-weather-network",
     WIS2_STATIONS = "wis2-stations",
     GLOBAL_FLIGHTS = "global-flights",
-    LIVE_FLIGHTS = "live-flights"
+    LIVE_FLIGHTS = "live-flights",
+    FLIGHT_SCHEDULE = "flight-schedule"
 }
 declare const LayerMetadataSchema: z.ZodObject<{
     source: z.ZodString;
@@ -422,6 +423,22 @@ declare const EventPayloadSchema: z.ZodObject<{
     }>>;
 }, z.core.$strip>;
 type EventPayload = z.infer<typeof EventPayloadSchema>;
+/**
+ * Response schema for flight schedule endpoint.
+ * Uses passthrough for flexible AeroDataBox response handling.
+ */
+declare const FlightScheduleResponseSchema: z.ZodObject<{
+    provider: z.ZodString;
+    data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+    timestamp: z.ZodString;
+    count: z.ZodOptional<z.ZodNumber>;
+    metadata: z.ZodOptional<z.ZodObject<{
+        source: z.ZodString;
+        cacheTTL: z.ZodNumber;
+        cached: z.ZodBoolean;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+type FlightScheduleResponse = z.infer<typeof FlightScheduleResponseSchema>;
 
 declare abstract class BaseClient {
     protected readonly http: AxiosInstance;
@@ -475,6 +492,52 @@ declare class AviationDomain extends BaseClient {
      * @param filters Center point and radius filters. Defaults to New York if not provided.
      */
     getLiveFlights(filters?: LiveFlightFilters): Promise<LayerResponse<FeatureCollection<FlightProps>>>;
+    /**
+     * Get flight schedule/details by callsign from AeroDataBox.
+     * @param callsign Flight identifier (e.g., 'UAL1234', 'AA100')
+     * @returns Raw flight schedule data from AeroDataBox API.
+     *
+     * @example
+     * ```ts
+     * const schedule = await sdk.aviation.getFlightSchedule('UAL1234');
+     * console.log(schedule.data); // Flight details from AeroDataBox
+     * ```
+     */
+    getFlightSchedule(callsign: string): Promise<FlightScheduleResponse>;
+}
+
+/**
+ * Response from /events/types endpoint.
+ */
+declare const EventTypesResponseSchema: z.ZodObject<{
+    types: z.ZodArray<z.ZodEnum<{
+        "earthquake.new": "earthquake.new";
+        "earthquake.updated": "earthquake.updated";
+        "storm.new": "storm.new";
+        "storm.updated": "storm.updated";
+        "wildfire.new": "wildfire.new";
+        "wildfire.updated": "wildfire.updated";
+        "volcano.alert": "volcano.alert";
+        "snapshot.completed": "snapshot.completed";
+        "snapshot.failed": "snapshot.failed";
+        "observation.batch": "observation.batch";
+    }>>;
+    descriptions: z.ZodRecord<z.ZodString, z.ZodString>;
+}, z.core.$strip>;
+type EventTypesResponse = z.infer<typeof EventTypesResponseSchema>;
+declare class EventsDomain extends BaseClient {
+    /**
+     * Get list of available event types for the event stream.
+     * @returns Object with event types array and their descriptions.
+     *
+     * @example
+     * ```ts
+     * const { types, descriptions } = await sdk.eventsMeta.getEventTypes();
+     * console.log(types); // ['earthquake.new', 'storm.new', ...]
+     * console.log(descriptions['earthquake.new']); // 'New earthquake detected'
+     * ```
+     */
+    getEventTypes(): Promise<EventTypesResponse>;
 }
 
 /**
@@ -543,6 +606,17 @@ declare class WeatherDomain extends BaseClient {
      * @param filters Date range filters.
      */
     getIemObservations(stationId: string, filters: ObservationFilters): Promise<ObservationQueryResult>;
+    /**
+     * Get weather stations from NWS (National Weather Service) network.
+     */
+    getNWSWeatherStations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>>;
+    /**
+     * Get active stations that have reported data in the last 24 hours.
+     * @param type The station network type ('iem' or 'wis2').
+     *
+     * Note: This endpoint returns FeatureCollection directly (not LayerResponse envelope).
+     */
+    getActiveStations(type: 'iem' | 'wis2'): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>>;
 }
 
 declare class MaritimeDomain extends BaseClient {
@@ -710,8 +784,11 @@ declare class GeoLayersSDK {
     readonly weather: WeatherDomain;
     readonly maritime: MaritimeDomain;
     readonly aviation: AviationDomain;
+    /** Real-time event stream (SSE) */
     readonly events: EventStream;
+    /** Event metadata operations (REST) */
+    readonly eventsMeta: EventsDomain;
     constructor(config: GeoLayersConfig);
 }
 
-export { type ActiveVolcanoProps, ActiveVolcanoPropsSchema, DEFAULT_CONFIG, type EarthquakeProps, EarthquakePropsSchema, type EventPayload, EventPayloadSchema, type Feature, type FeatureCollection, type FlightProps, FlightPropsSchema, GeoLayersApiError, type GeoLayersConfig, GeoLayersError, GeoLayersSDK, GeoLayersValidationError, type Geometry, GeometrySchema, type LayerMetadata, LayerMetadataSchema, LayerProvider, type LayerResponse, type MeasurementValue, MeasurementValueSchema, type ObservationQueryResult, ObservationQueryResultSchema, type StandardMeasurements, StandardMeasurementsSchema, type StandardObservation, StandardObservationSchema, type StormProps, StormPropsSchema, type VolcanoProps, VolcanoPropsSchema, type WeatherStationProps, WeatherStationPropsSchema, type WildfireProps, WildfirePropsSchema, createFeatureCollectionSchema, createFeatureSchema, createLayerResponseSchema, GeoLayersSDK as default };
+export { type ActiveVolcanoProps, ActiveVolcanoPropsSchema, DEFAULT_CONFIG, type EarthquakeProps, EarthquakePropsSchema, type EventPayload, EventPayloadSchema, type Feature, type FeatureCollection, type FlightProps, FlightPropsSchema, type FlightScheduleResponse, FlightScheduleResponseSchema, GeoLayersApiError, type GeoLayersConfig, GeoLayersError, GeoLayersSDK, GeoLayersValidationError, type Geometry, GeometrySchema, type LayerMetadata, LayerMetadataSchema, LayerProvider, type LayerResponse, type MeasurementValue, MeasurementValueSchema, type ObservationQueryResult, ObservationQueryResultSchema, type StandardMeasurements, StandardMeasurementsSchema, type StandardObservation, StandardObservationSchema, type StormProps, StormPropsSchema, type VolcanoProps, VolcanoPropsSchema, type WeatherStationProps, WeatherStationPropsSchema, type WildfireProps, WildfirePropsSchema, createFeatureCollectionSchema, createFeatureSchema, createLayerResponseSchema, GeoLayersSDK as default };
