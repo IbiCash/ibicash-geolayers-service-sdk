@@ -16,11 +16,17 @@
   "files": [
     "dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IbiCash/ibicash-geolayers-service-sdk.git"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean --external axios --external zod",
     "dev": "tsup src/index.ts --format cjs,esm --watch --dts --external axios --external zod",
     "lint": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "prepublishOnly": "npm run build",
+    "release": "npm run build && npm run lint"
   },
   "keywords": [
     "geojson",
