@@ -1,5 +1,5 @@
 {
-  "name": "geolayers-service-sdk",
+  "name": "@ibicash/geolayers-sdk",
   "version": "1.0.0",
   "description": "Premium TypeScript SDK for GeoLayers Service",
   "main": "dist/index.cjs",
@@ -16,6 +16,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/IbiCash/ibicash-geolayers-service-sdk.git"
