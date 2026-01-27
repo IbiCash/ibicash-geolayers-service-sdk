@@ -33,7 +33,7 @@ export class EventsDomain extends BaseClient {
     /**
      * Get list of available event types for the event stream.
      * @returns Object with event types array and their descriptions.
-     * 
+     *
      * @example
      * ```ts
      * const { types, descriptions } = await sdk.eventsMeta.getEventTypes();
@@ -42,7 +42,13 @@ export class EventsDomain extends BaseClient {
      * ```
      */
     async getEventTypes(): Promise<EventTypesResponse> {
-        const data = await this.get<unknown>('/events/types');
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/events/types',
+            v2: null,
+        });
+
+        const data = await this.get<unknown>(url);
         return EventTypesResponseSchema.parse(data);
     }
 }

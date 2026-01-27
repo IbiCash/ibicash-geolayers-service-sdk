@@ -4,8 +4,6 @@ import {
     LayerResponse,
     WeatherStationProps,
     WeatherStationPropsSchema,
-    Feature,
-    Geometry,
     ObservationProvider,
     StationObservationsResult,
     StationObservationsResultSchema,
@@ -59,16 +57,28 @@ export class ObservationsDomain extends BaseClient {
      * Get active WIS2 stations that reported data in the last 24 hours.
      */
     async getActiveWis2Stations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
-        const rawData = await this.get<unknown>('/observations/wis2/stations/active');
-        return this.parseActiveStationsResponse(rawData, 'wis2');
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/observations/wis2/stations/active',
+            v2: null,
+        });
+
+        const rawData = await this.get<unknown>(url);
+        return this.normalizeGeoJSONResponse(rawData, WeatherStationPropsSchema, 'active-wis2-stations');
     }
 
     /**
      * Get active IEM/AZOS stations that reported data in the last 24 hours.
      */
     async getActiveIemStations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
-        const rawData = await this.get<unknown>('/observations/iem/stations/active');
-        return this.parseActiveStationsResponse(rawData, 'iem');
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/observations/iem/stations/active',
+            v2: null,
+        });
+
+        const rawData = await this.get<unknown>(url);
+        return this.normalizeGeoJSONResponse(rawData, WeatherStationPropsSchema, 'active-iem-stations');
     }
 
     /**
@@ -77,8 +87,14 @@ export class ObservationsDomain extends BaseClient {
      * @param filters Query filters including provider and date range.
      */
     async getStationObservations(stationId: string, filters: StationObservationFilters): Promise<StationObservationsResult> {
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: `/observations/station/${stationId}`,
+            v2: null,
+        });
+
         const params = this.buildDateParams(filters);
-        const data = await this.get<StationObservationsResult>(`/observations/station/${stationId}`, params);
+        const data = await this.get<StationObservationsResult>(url, params);
         return StationObservationsResultSchema.parse(data);
     }
 
@@ -88,7 +104,13 @@ export class ObservationsDomain extends BaseClient {
      * @param provider The observation provider.
      */
     async getLatestObservation(stationId: string, provider: ObservationProvider): Promise<LatestObservationResult> {
-        const data = await this.get<LatestObservationResult>(`/observations/station/${stationId}/latest`, { provider });
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: `/observations/station/${stationId}/latest`,
+            v2: null,
+        });
+
+        const data = await this.get<LatestObservationResult>(url, { provider });
         return LatestObservationResultSchema.parse(data);
     }
 
@@ -97,6 +119,12 @@ export class ObservationsDomain extends BaseClient {
      * @param filters Bounding box coordinates and query filters.
      */
     async getObservationsByBbox(filters: BboxFilters): Promise<BboxObservationsResult> {
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/observations/bbox',
+            v2: null,
+        });
+
         const params = {
             ...this.buildDateParams(filters),
             minLon: filters.minLon,
@@ -104,7 +132,7 @@ export class ObservationsDomain extends BaseClient {
             maxLon: filters.maxLon,
             maxLat: filters.maxLat,
         };
-        const data = await this.get<BboxObservationsResult>('/observations/bbox', params);
+        const data = await this.get<BboxObservationsResult>(url, params);
         return BboxObservationsResultSchema.parse(data);
     }
 
@@ -113,8 +141,14 @@ export class ObservationsDomain extends BaseClient {
      * @param provider Optional provider filter. If not specified, returns stats for all providers.
      */
     async getStats(provider?: ObservationProvider): Promise<ObservationStatsResult> {
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/observations/stats',
+            v2: null,
+        });
+
         const params = provider ? { provider } : {};
-        const data = await this.get<ObservationStatsResult>('/observations/stats', params);
+        const data = await this.get<ObservationStatsResult>(url, params);
         return ObservationStatsResultSchema.parse(data);
     }
 
@@ -154,39 +188,4 @@ export class ObservationsDomain extends BaseClient {
         return params;
     }
 
-    /**
-     * Parse active stations response.
-     * The endpoint may return either a FeatureCollection directly or wrapped in LayerResponse.
-     */
-    private parseActiveStationsResponse(
-        rawData: unknown,
-        provider: string
-    ): LayerResponse<FeatureCollection<WeatherStationProps>> {
-        const featureCollection = rawData as { type: string; features: unknown[]; metadata?: unknown };
-
-        if (featureCollection?.type === 'FeatureCollection') {
-            const features: Feature<WeatherStationProps>[] = (featureCollection.features ?? []).map((f: unknown) => {
-                const feature = f as { type: 'Feature'; geometry: Geometry; properties: unknown; id?: string | number };
-                return {
-                    type: 'Feature' as const,
-                    geometry: feature.geometry,
-                    properties: WeatherStationPropsSchema.parse(feature.properties ?? {}),
-                    id: feature.id,
-                };
-            });
-
-            return {
-                provider: `active-stations-${provider}`,
-                data: {
-                    type: 'FeatureCollection' as const,
-                    features,
-                },
-                timestamp: new Date().toISOString(),
-                count: features.length,
-            };
-        }
-
-        // Fallback: try parsing as LayerResponse
-        return this.parseGeoJSON(rawData, WeatherStationPropsSchema);
-    }
 }

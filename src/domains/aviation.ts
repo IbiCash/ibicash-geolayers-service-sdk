@@ -40,14 +40,20 @@ export class AviationDomain extends BaseClient {
      * @param filters Optional bounding box filters. Defaults to whole world.
      */
     async getGlobalFlights(filters: FlightFilters = {}): Promise<LayerResponse<FeatureCollection<FlightProps>>> {
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/flights/global',
+            v2: null,
+        });
+
         const params = {
             lamin: filters.lamin ?? -90,
             lomin: filters.lomin ?? -180,
             lamax: filters.lamax ?? 90,
             lomax: filters.lomax ?? 180,
         };
-        const data = await this.get<unknown>('/geojson/flights/global', params);
-        return this.parseGeoJSON(data, FlightPropsSchema);
+        const data = await this.get<unknown>(url, params);
+        return this.normalizeGeoJSONResponse(data, FlightPropsSchema, 'global-flights');
     }
 
     /**
@@ -55,20 +61,26 @@ export class AviationDomain extends BaseClient {
      * @param filters Center point and radius filters. Defaults to New York if not provided.
      */
     async getLiveFlights(filters: LiveFlightFilters = { lat: 40.7128, lng: -74.006 }): Promise<LayerResponse<FeatureCollection<FlightProps>>> {
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/flights/live',
+            v2: null,
+        });
+
         const params = {
             lat: filters.lat,
             lng: filters.lng,
             radius: filters.radius ?? 250,
         };
-        const data = await this.get<unknown>('/geojson/flights/live', params);
-        return this.parseGeoJSON(data, FlightPropsSchema);
+        const data = await this.get<unknown>(url, params);
+        return this.normalizeGeoJSONResponse(data, FlightPropsSchema, 'live-flights');
     }
 
     /**
      * Get flight schedule/details by callsign from AeroDataBox.
      * @param callsign Flight identifier (e.g., 'UAL1234', 'AA100')
      * @returns Raw flight schedule data from AeroDataBox API.
-     * 
+     *
      * @example
      * ```ts
      * const schedule = await sdk.aviation.getFlightSchedule('UAL1234');
@@ -76,7 +88,13 @@ export class AviationDomain extends BaseClient {
      * ```
      */
     async getFlightSchedule(callsign: string): Promise<FlightScheduleResponse> {
-        const data = await this.get<unknown>('/geojson/flights/schedule', { callsign });
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/flights/schedule',
+            v2: null,
+        });
+
+        const data = await this.get<unknown>(url, { callsign });
         return FlightScheduleResponseSchema.parse(data);
     }
 }
