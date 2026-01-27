@@ -54,7 +54,7 @@ describe('WeatherDomain', () => {
 
             const result = await sdk.weather.getWis2Stations();
 
-            expect(mockGet).toHaveBeenCalledWith('/geojson/stations/wis2', {
+            expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/stations/wis2', {
                 params: {
                     limit: 100,
                     offset: 0
@@ -72,7 +72,7 @@ describe('WeatherDomain', () => {
             const filters = { start: '2024-01-01', end: '2024-01-31' };
             const result = await sdk.weather.getWis2Observations('WIGOS-123', filters);
 
-            expect(mockGet).toHaveBeenCalledWith('/observations/wis2/WIGOS-123', { params: filters });
+            expect(mockGet).toHaveBeenCalledWith('/api/v1/observations/wis2/WIGOS-123', { params: filters });
             expect(result.stationId).toBe('WIGOS-0-20000-0-12345');
         });
     });
@@ -92,7 +92,7 @@ describe('WeatherDomain', () => {
 
             const result = await sdk.weather.getIemStations();
 
-            expect(mockGet).toHaveBeenCalledWith('/geojson/stations/azos', { params: undefined });
+            expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/stations/azos', { params: undefined });
         });
 
         it('should fetch IEM observations', async () => {
@@ -104,7 +104,7 @@ describe('WeatherDomain', () => {
             const filters = { start: '2024-01-01', end: '2024-01-31' };
             const result = await sdk.weather.getIemObservations('KNYC', filters);
 
-            expect(mockGet).toHaveBeenCalledWith('/observations/iem/KNYC', { params: filters });
+            expect(mockGet).toHaveBeenCalledWith('/api/v1/observations/iem/KNYC', { params: filters });
         });
     });
 });

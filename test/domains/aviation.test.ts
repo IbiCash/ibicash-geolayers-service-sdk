@@ -55,7 +55,7 @@ describe('AviationDomain', () => {
 
         const result = await sdk.aviation.getGlobalFlights();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/flights/global', {
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/flights/global', {
             params: {
                 lamin: -90,
                 lomin: -180,
@@ -74,7 +74,7 @@ describe('AviationDomain', () => {
 
         const result = await sdk.aviation.getLiveFlights();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/flights/live', {
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/flights/live', {
             params: {
                 lat: 40.7128,
                 lng: -74.006,

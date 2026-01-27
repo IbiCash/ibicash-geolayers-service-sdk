@@ -53,7 +53,7 @@ describe('MaritimeDomain', () => {
 
         const result = await sdk.maritime.getBuoyStations();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/buoys/stations', { params: undefined });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/buoys/stations', { params: undefined });
         expect(result.data.features[0].properties.id).toBe('41001');
     });
 
@@ -71,7 +71,7 @@ describe('MaritimeDomain', () => {
 
         const result = await sdk.maritime.getLatestBuoyObservations();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/buoys/observations', { params: undefined });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/buoys/observations', { params: undefined });
     });
 
     it('should fetch buoy observations with filters', async () => {
@@ -83,6 +83,6 @@ describe('MaritimeDomain', () => {
         const filters = { start: '2024-01-01', end: '2024-01-31' };
         const result = await sdk.maritime.getBuoyObservations('41001', filters);
 
-        expect(mockGet).toHaveBeenCalledWith('/observations/buoy/41001', { params: filters });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/observations/buoy/41001', { params: filters });
     });
 });

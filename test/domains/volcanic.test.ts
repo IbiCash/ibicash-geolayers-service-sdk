@@ -57,7 +57,7 @@ describe('VolcanicDomain', () => {
 
         const result = await sdk.volcanic.getVolcanoes();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/volcanoes', { params: undefined });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/volcanoes', { params: undefined });
         expect(result.data.features[0].properties.volcanoName).toBe('Mount Yasur');
     });
 
@@ -79,7 +79,7 @@ describe('VolcanicDomain', () => {
 
         const result = await sdk.volcanic.getActiveVolcanoes();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/volcanoes/active', { params: undefined });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/volcanoes/active', { params: undefined });
         expect(result.provider).toBe('volcanoes');
     });
 });
