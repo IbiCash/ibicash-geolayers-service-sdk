@@ -113,7 +113,13 @@ export class SeismicDomain extends BaseClient {
             ...(minMagnitude !== undefined && { minMagnitude }),
         };
 
-        const data = await this.get<unknown>('/geojson/earthquakes', params);
-        return this.parseGeoJSON(data, EarthquakePropsSchema);
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/earthquakes',
+            v2: null,
+        });
+
+        const data = await this.get<unknown>(url, params);
+        return this.normalizeGeoJSONResponse(data, EarthquakePropsSchema, 'earthquakes');
     }
 }

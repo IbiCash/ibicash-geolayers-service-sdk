@@ -6,8 +6,29 @@ import {
     FeatureCollection,
     LayerResponse
 } from '../types';
-import { DEFAULT_CONFIG, GeoLayersConfig } from './config';
+import { ApiVersion, DEFAULT_CONFIG, GeoLayersConfig } from './config';
 import { GeoLayersApiError } from './errors';
+
+/**
+ * URL mapping for endpoints that differ between API versions.
+ * Use null to indicate an endpoint is not available in that version.
+ */
+export interface VersionedEndpoint {
+    /** v1 endpoint path (without /api/v1 prefix). Use null if not available in v1. */
+    v1: string | null;
+    /** v2 endpoint path (without /api/v2 prefix). Use null if not available in v2. */
+    v2: string | null;
+}
+
+/**
+ * Result of URL resolution, includes which version was actually selected.
+ */
+export interface ResolvedUrl {
+    /** Full URL path including version prefix */
+    url: string;
+    /** The API version that was selected */
+    version: ApiVersion;
+}
 
 interface ApiErrorResponse {
     message?: string | string[];
@@ -16,16 +37,94 @@ interface ApiErrorResponse {
 
 export abstract class BaseClient {
     protected readonly http: AxiosInstance;
-    protected readonly config: GeoLayersConfig;
+    protected readonly config: Required<Pick<GeoLayersConfig, 'baseUrl' | 'apiKey' | 'apiBasePath' | 'apiVersion'>> & GeoLayersConfig;
+    private readonly preferredVersion: ApiVersion;
 
     constructor(config: GeoLayersConfig) {
-        this.config = { ...DEFAULT_CONFIG, ...config };
+        this.config = {
+            ...DEFAULT_CONFIG,
+            ...config,
+            apiBasePath: config.apiBasePath ?? DEFAULT_CONFIG.apiBasePath ?? '/api',
+            apiVersion: config.apiVersion ?? DEFAULT_CONFIG.apiVersion ?? 'v1',
+        } as typeof this.config;
+        this.preferredVersion = this.config.apiVersion;
+
+        // Create axios instance with base URL only (no version path)
         this.http = axios.create({
             baseURL: this.config.baseUrl,
             timeout: this.config.timeout,
         });
 
         this.setupInterceptors();
+    }
+
+    /**
+     * Returns true if the SDK prefers API v2.
+     */
+    protected get isV2(): boolean {
+        return this.preferredVersion === 'v2';
+    }
+
+    /**
+     * Returns the preferred API version.
+     */
+    protected get apiVersion(): ApiVersion {
+        return this.preferredVersion;
+    }
+
+    /**
+     * Builds a versioned URL path.
+     * @param version API version to use
+     * @param endpoint Endpoint path (without version prefix)
+     */
+    private buildVersionedPath(version: ApiVersion, endpoint: string): string {
+        const basePath = this.config.apiBasePath;
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        return `${basePath}/${version}${normalizedEndpoint}`;
+    }
+
+    /**
+     * Resolves the appropriate URL based on API version and availability.
+     * Falls back to the other version if preferred is not available.
+     *
+     * @param endpoints Object with v1 and v2 URL paths (use null if unavailable)
+     * @returns ResolvedUrl with full path and selected version
+     * @throws Error if no endpoint is available for either version
+     */
+    protected resolveEndpoint(endpoints: VersionedEndpoint): ResolvedUrl {
+        // Try preferred version first
+        if (this.isV2 && endpoints.v2 !== null) {
+            return {
+                url: this.buildVersionedPath('v2', endpoints.v2),
+                version: 'v2',
+            };
+        }
+
+        // Fallback to v1 if v2 not available or not preferred
+        if (endpoints.v1 !== null) {
+            return {
+                url: this.buildVersionedPath('v1', endpoints.v1),
+                version: 'v1',
+            };
+        }
+
+        // If v1 not available but v2 is, use v2
+        if (endpoints.v2 !== null) {
+            return {
+                url: this.buildVersionedPath('v2', endpoints.v2),
+                version: 'v2',
+            };
+        }
+
+        throw new Error('No endpoint available for either API version');
+    }
+
+    /**
+     * Resolves URL - convenience method that returns just the URL string.
+     * Use resolveEndpoint() if you need to know which version was selected.
+     */
+    protected resolveUrl(endpoints: VersionedEndpoint): string {
+        return this.resolveEndpoint(endpoints).url;
     }
 
     private setupInterceptors(): void {
@@ -114,5 +213,44 @@ export abstract class BaseClient {
     ): LayerResponse<FeatureCollection<z.infer<T>>> {
         const schema = createLayerResponseSchema(createFeatureCollectionSchema(propsSchema));
         return schema.parse(data) as LayerResponse<FeatureCollection<z.infer<T>>>;
+    }
+
+    /**
+     * Normalizes API responses to a consistent LayerResponse format.
+     * Handles both:
+     * - v1 responses: LayerResponse envelope with data field
+     * - v2 responses: Direct FeatureCollection
+     *
+     * @param data Raw response data from the API
+     * @param propsSchema Zod schema for feature properties
+     * @param provider Provider name to use when wrapping v2 responses
+     */
+    protected normalizeGeoJSONResponse<T extends z.ZodTypeAny>(
+        data: unknown,
+        propsSchema: T,
+        provider: string
+    ): LayerResponse<FeatureCollection<z.infer<T>>> {
+        const record = data as Record<string, unknown>;
+
+        // Check if this is already a LayerResponse (v1 format)
+        if (record?.provider && record?.data && record?.timestamp) {
+            return this.parseGeoJSON(data, propsSchema);
+        }
+
+        // Check if this is a direct FeatureCollection (v2 format)
+        if (record?.type === 'FeatureCollection' && Array.isArray(record?.features)) {
+            const featureCollectionSchema = createFeatureCollectionSchema(propsSchema);
+            const featureCollection = featureCollectionSchema.parse(data);
+
+            return {
+                provider,
+                data: featureCollection as FeatureCollection<z.infer<T>>,
+                timestamp: new Date().toISOString(),
+                count: (featureCollection as FeatureCollection<z.infer<T>>).features.length,
+            };
+        }
+
+        // Fallback: try to parse as LayerResponse
+        return this.parseGeoJSON(data, propsSchema);
     }
 }

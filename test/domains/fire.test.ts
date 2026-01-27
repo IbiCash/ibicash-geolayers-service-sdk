@@ -56,7 +56,7 @@ describe('FireDomain', () => {
 
         const result = await sdk.fire.getWildfires();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/wildfires', { params: { days: 1 } });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/wildfires', { params: { days: 1 } });
         expect(result.data.features[0].properties.brightness).toBe(325.8);
     });
 });

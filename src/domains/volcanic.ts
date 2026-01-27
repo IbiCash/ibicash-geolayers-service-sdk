@@ -28,7 +28,13 @@ export class VolcanicDomain extends BaseClient {
      * Note: API returns array of Features, normalized to FeatureCollection here.
      */
     async getVolcanoes(): Promise<LayerResponse<FeatureCollection<VolcanoProps>>> {
-        const raw = await this.get<unknown>('/geojson/volcanoes');
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/volcanoes',
+            v2: null,
+        });
+
+        const raw = await this.get<unknown>(url);
         const parsed = VolcanoesResponseSchema.parse(raw);
 
         // Normalize: wrap array of Features into a FeatureCollection
@@ -48,7 +54,13 @@ export class VolcanicDomain extends BaseClient {
      * Get list of currently active volcanoes (GDACS).
      */
     async getActiveVolcanoes(): Promise<LayerResponse<FeatureCollection<ActiveVolcanoProps>>> {
-        const data = await this.get<unknown>('/geojson/volcanoes/active');
-        return this.parseGeoJSON(data, ActiveVolcanoPropsSchema);
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/volcanoes/active',
+            v2: null,
+        });
+
+        const data = await this.get<unknown>(url);
+        return this.normalizeGeoJSONResponse(data, ActiveVolcanoPropsSchema, 'active-volcanoes');
     }
 }

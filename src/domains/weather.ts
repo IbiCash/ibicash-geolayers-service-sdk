@@ -1,8 +1,6 @@
 import { BaseClient } from '../core/client';
 import {
-    Feature,
     FeatureCollection,
-    Geometry,
     LayerResponse,
     ObservationQueryResult,
     ObservationQueryResultSchema,
@@ -48,12 +46,19 @@ export class WeatherDomain extends BaseClient {
      * @param filters Optional pagination filters.
      */
     async getWis2Stations(filters: Wis2StationFilters = {}): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
-        const params = {
+        const { url, version } = this.resolveEndpoint({
+            v1: '/geojson/stations/wis2',
+            v2: '/stations?provider=wis2',
+        });
+
+        // v1 requires explicit pagination defaults, v2 handles it server-side
+        const params = version === 'v2' ? filters : {
             limit: filters.limit ?? 100,
             offset: filters.offset ?? 0,
         };
-        const data = await this.get<unknown>('/geojson/stations/wis2', params);
-        return this.parseGeoJSON(data, WeatherStationPropsSchema);
+
+        const data = await this.get<unknown>(url, params);
+        return this.normalizeGeoJSONResponse(data, WeatherStationPropsSchema, 'wis2-stations');
     }
 
     /**
@@ -62,7 +67,13 @@ export class WeatherDomain extends BaseClient {
      * @param filters Date range and optional WIS2-specific filters.
      */
     async getWis2Observations(stationId: string, filters: Wis2ObservationFilters): Promise<ObservationQueryResult> {
-        const data = await this.get<ObservationQueryResult>(`/observations/wis2/${stationId}`, filters);
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: `/observations/wis2/${stationId}`,
+            v2: null,
+        });
+
+        const data = await this.get<ObservationQueryResult>(url, filters);
         return ObservationQueryResultSchema.parse(data);
     }
 
@@ -70,8 +81,13 @@ export class WeatherDomain extends BaseClient {
      * Get weather stations from IEM/AZOS network.
      */
     async getIemStations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
-        const data = await this.get<unknown>('/geojson/stations/azos');
-        return this.parseGeoJSON(data, WeatherStationPropsSchema);
+        const { url, version } = this.resolveEndpoint({
+            v1: '/geojson/stations/azos',
+            v2: '/stations?provider=iem',
+        });
+
+        const data = await this.get<unknown>(url);
+        return this.normalizeGeoJSONResponse(data, WeatherStationPropsSchema, 'iem-stations');
     }
 
     /**
@@ -80,7 +96,13 @@ export class WeatherDomain extends BaseClient {
      * @param filters Date range filters.
      */
     async getIemObservations(stationId: string, filters: ObservationFilters): Promise<ObservationQueryResult> {
-        const data = await this.get<ObservationQueryResult>(`/observations/iem/${stationId}`, filters);
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: `/observations/iem/${stationId}`,
+            v2: null,
+        });
+
+        const data = await this.get<ObservationQueryResult>(url, filters);
         return ObservationQueryResultSchema.parse(data);
     }
 
@@ -88,46 +110,28 @@ export class WeatherDomain extends BaseClient {
      * Get weather stations from NWS (National Weather Service) network.
      */
     async getNWSWeatherStations(): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
-        const data = await this.get<unknown>('/geojson/stations/nws');
-        return this.parseGeoJSON(data, WeatherStationPropsSchema);
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/geojson/stations/nws',
+            v2: null,
+        });
+
+        const data = await this.get<unknown>(url);
+        return this.normalizeGeoJSONResponse(data, WeatherStationPropsSchema, 'nws-stations');
     }
 
     /**
      * Get active stations that have reported data in the last 24 hours.
      * @param type The station network type ('iem' or 'wis2').
-     * 
-     * Note: This endpoint returns FeatureCollection directly (not LayerResponse envelope).
      */
     async getActiveStations(type: 'iem' | 'wis2'): Promise<LayerResponse<FeatureCollection<WeatherStationProps>>> {
-        const rawData = await this.get<unknown>('/stations/active', { type });
+        // v1 only - not yet migrated to v2
+        const url = this.resolveUrl({
+            v1: '/stations/active',
+            v2: null,
+        });
 
-        // The /stations/active endpoint returns FeatureCollection directly, not LayerResponse
-        // Parse it as FeatureCollection and wrap in LayerResponse format
-        const featureCollection = rawData as { type: string; features: unknown[]; metadata?: unknown };
-
-        if (featureCollection?.type === 'FeatureCollection') {
-            const features: Feature<WeatherStationProps>[] = (featureCollection.features ?? []).map((f: unknown) => {
-                const feature = f as { type: 'Feature'; geometry: Geometry; properties: unknown; id?: string | number };
-                return {
-                    type: 'Feature' as const,
-                    geometry: feature.geometry,
-                    properties: WeatherStationPropsSchema.parse(feature.properties ?? {}),
-                    id: feature.id,
-                };
-            });
-
-            return {
-                provider: `active-stations-${type}`,
-                data: {
-                    type: 'FeatureCollection' as const,
-                    features,
-                },
-                timestamp: new Date().toISOString(),
-                count: features.length,
-            };
-        }
-
-        // Fallback: try parsing as LayerResponse
-        return this.parseGeoJSON(rawData, WeatherStationPropsSchema);
+        const rawData = await this.get<unknown>(url, { type });
+        return this.normalizeGeoJSONResponse(rawData, WeatherStationPropsSchema, `active-stations-${type}`);
     }
 }

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { GeoLayersConfig } from '../core/config';
+import { DEFAULT_CONFIG, GeoLayersConfig } from '../core/config';
 import { EventPayload, EventPayloadSchema } from '../types';
 
 type EventStreamListener = (payload: EventPayload) => void;
@@ -11,7 +11,10 @@ export class EventStream extends EventEmitter {
 
     constructor(config: GeoLayersConfig) {
         super();
-        this.url = `${config.baseUrl}/events/stream?apiKey=${config.apiKey}`;
+        const baseUrl = config.baseUrl;
+        const apiBasePath = config.apiBasePath ?? DEFAULT_CONFIG.apiBasePath ?? '/api';
+        // Event stream is v1 only for now
+        this.url = `${baseUrl}${apiBasePath}/v1/events/stream?apiKey=${config.apiKey}`;
     }
 
     /**

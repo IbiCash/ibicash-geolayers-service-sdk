@@ -54,7 +54,7 @@ describe('TropicalDomain', () => {
 
         const result = await sdk.tropical.getActiveStorms();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/storms/active', { params: undefined });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/storms/active', { params: undefined });
         expect(result.data.features[0].properties.stormname).toBe('Alberto');
     });
 
@@ -66,6 +66,6 @@ describe('TropicalDomain', () => {
 
         const result = await sdk.tropical.getRecentStorms();
 
-        expect(mockGet).toHaveBeenCalledWith('/geojson/storms/recent', { params: undefined });
+        expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/storms/recent', { params: undefined });
     });
 });

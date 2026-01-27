@@ -41,7 +41,7 @@ describe('SeismicDomain', () => {
 
             expect(result.provider).toBe('earthquakes');
             expect(result.data.features).toHaveLength(1);
-            expect(mockGet).toHaveBeenCalledWith('/geojson/earthquakes', expect.objectContaining({
+            expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/earthquakes', expect.objectContaining({
                 params: expect.objectContaining({
                     startTime: expect.any(String),
                     endTime: expect.any(String),
@@ -59,7 +59,7 @@ describe('SeismicDomain', () => {
             const filters = { startTime: '2024-01-01', endTime: '2024-01-31', minMagnitude: 4.0 };
             await sdk.seismic.getEarthquakes(filters);
 
-            expect(mockGet).toHaveBeenCalledWith('/geojson/earthquakes', { params: filters });
+            expect(mockGet).toHaveBeenCalledWith('/api/v1/geojson/earthquakes', { params: filters });
         });
 
         it('should throw on invalid response data', async () => {
