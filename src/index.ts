@@ -9,6 +9,7 @@ import { TropicalDomain } from './domains/tropical';
 import { VolcanicDomain } from './domains/volcanic';
 import { WeatherDomain } from './domains/weather';
 import { EventStream } from './events/stream';
+export type { ChartDataFilters } from './domains/observations';
 
 export * from './core/config';
 export * from './core/errors';

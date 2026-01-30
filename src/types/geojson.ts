@@ -400,3 +400,50 @@ export const ObservationStatsResultSchema = z.object({
 });
 
 export type ObservationStatsResult = z.infer<typeof ObservationStatsResultSchema>;
+
+// --- V2 Chart Types ---
+
+/**
+ * Measurements object - core fields plus extensible via index signature.
+ * Additional fields (pressure, dewPoint, etc.) come from details JSON.
+ */
+export const ChartMeasurementsSchema = z.record(z.string(), z.number().optional());
+export type ChartMeasurements = z.infer<typeof ChartMeasurementsSchema>;
+
+/**
+ * Single observation point for charts.
+ */
+export const ChartObservationSchema = z.object({
+    stationId: z.string(),
+    timestamp: z.string(), // ISO8601
+    measurements: ChartMeasurementsSchema,
+});
+export type ChartObservation = z.infer<typeof ChartObservationSchema>;
+
+/**
+ * Time range metadata.
+ */
+export const ChartTimeRangeSchema = z.object({
+    start: z.string(), // ISO8601
+    end: z.string(),   // ISO8601
+});
+export type ChartTimeRange = z.infer<typeof ChartTimeRangeSchema>;
+
+/**
+ * Chart metadata.
+ */
+export const ChartMetaSchema = z.object({
+    stationId: z.string(),
+    timeRange: ChartTimeRangeSchema,
+    count: z.number(),
+});
+export type ChartMeta = z.infer<typeof ChartMetaSchema>;
+
+/**
+ * Full chart response from v2 endpoint.
+ */
+export const ChartResponseSchema = z.object({
+    data: z.array(ChartObservationSchema),
+    meta: ChartMetaSchema,
+});
+export type ChartResponse = z.infer<typeof ChartResponseSchema>;
