@@ -1,11 +1,16 @@
+export * from './animals';
 export * from './aviation';
+export * from './ecoregions';
 export * from './events';
 export * from './fire';
+export * from './hydrosheds';
 export * from './maritime';
 export * from './observations';
+export * from './properties';
+export * from './protected-areas';
 export * from './seismic';
+export * from './soils';
+export * from './territories';
 export * from './tropical';
 export * from './volcanic';
 export * from './weather';
-
-
